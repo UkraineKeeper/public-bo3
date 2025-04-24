@@ -1,0 +1,83 @@
+name: Run e2e tests
+
+on:
+  schedule:
+    # 🕔 Stage тести о 16:00 та 09:00
+    - cron: "0 16 * * *"  # Stage о 16:00
+
+    # 🕕 Prod тести о 18:00 та 10:00
+    - cron: "0 18 * * *"  # Prod о 18:00
+
+    # 🕛 userDev.spec.ts о 12:00
+    - cron: "0 12 * * *"  # userDev один раз на день
+
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: "Choose projects to run tests for (comma-separated, e.g., userDev,guestTests)"
+        type: string
+        required: true
+        default: "guestTests"
+
+permissions:
+  id-token: write
+  contents: read
+  checks: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.50.1-jammy
+    env:
+      GITHUB: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 🚀 Stage тести (16:00 та 09:00)
+      - name: Run Stage Tests (16:00 & 09:00)
+        if: github.event.schedule == '0 16 * * *'
+        run: |
+          PROJECTS="${{ github.event.inputs.projects || 'guestTests' }}"
+          for PROJECT in $(echo $PROJECTS | tr ',' '\n'); do
+            npm run test:stage:file -- tests/${PROJECT}.spec.ts
+          done
+
+      # 🏁 Prod тести (18:00 та 10:00)
+      - name: Run Prod Tests (18:00 & 10:00)
+        if: github.event.schedule == '0 18 * * *'
+        run: |
+          PROJECTS="${{ github.event.inputs.projects || 'guestTests' }}"
+          for PROJECT in $(echo $PROJECTS | tr ',' '\n'); do
+            npm run test:prod:file -- tests/${PROJECT}.spec.ts
+          done
+
+      # 🔔 userDev.spec.ts окремо (12:00 щодня)
+      - name: Run userDev.spec.ts Daily (12:00)
+        if: github.event.schedule == '0 12 */2 * *'
+        run: |
+          echo "Running daily userDev.spec.ts at 12:00"
+          npx playwright test tests/userDev.spec.ts
+
+      # 🖐️ Ручний запуск тестів
+      - name: Run Tests Manually (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          PROJECTS="${{ github.event.inputs.projects }}"
+          for PROJECT in $(echo $PROJECTS | tr ',' '\n'); do
+            npm run test:stage:file -- tests/${PROJECT}.spec.ts
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upload-report
+          path: playwright-report/
+          retention-days: 14

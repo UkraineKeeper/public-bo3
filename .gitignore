@@ -1,0 +1,15 @@
+node_modules/
+helpers/screenshots/
+helpers/oldTests/
+helpers/results/
+helpers/reports/
+/test-results/
+/blob-report/
+/playwright/.cache/
+users/users.ts
+tests/.storage/
+.vscode/
+playwright-report/
+allure-report/
+allure-results/
+allure-last/
